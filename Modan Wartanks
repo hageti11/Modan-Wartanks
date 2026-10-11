@@ -1,0 +1,1192 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#030503">
+<title>Modern Wartanks 2D Online</title>
+<style>
+* { box-sizing: border-box; -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+html { font-size: clamp(9px, calc(min(100vw, 200vh) / 90), 20px); }
+body, html {
+  margin: 0; padding: 0; width: 100%; height: 100%;
+  overflow: hidden; background: #030503; color: #fff;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans", "Yu Gothic", Roboto, sans-serif;
+  touch-action: none;
+}
+body { display: flex; justify-content: center; align-items: center; }
+input { -webkit-user-select: text; user-select: text; }
+#gameContainer {
+  position: relative;
+  width: min(100vw, 200vh);
+  width: min(100vw, 200dvh);
+  aspect-ratio: 2 / 1;
+  background: #080c08;
+  box-shadow: 0 0 30px rgba(0,0,0,0.9);
+  overflow: hidden;
+}
+canvas { display: block; width: 100%; height: 100%; background: #111a10; }
+
+/* ---------- 画面 ---------- */
+.screen {
+  display: none; position: absolute; inset: 0;
+  background: rgba(5, 8, 5, 0.97); flex-direction: column;
+  align-items: center; justify-content: center; z-index: 20; padding: 1.2rem; gap: 0.9rem;
+}
+h1 { color: #44ff88; font-size: 2rem; margin: 0; text-shadow: 0 0 12px rgba(68,255,136,0.6); text-align: center; letter-spacing: 1px; }
+.sub { color: #8fb39a; font-size: 1.1rem; margin: 0; text-align: center; }
+.row { display: flex; gap: 0.8rem; flex-wrap: wrap; justify-content: center; align-items: center; }
+.select-btn {
+  padding: 0.9rem 1.5rem; font-size: 1.15rem; font-weight: bold; border: 2px solid #2a6638;
+  border-radius: 6px; background: linear-gradient(135deg, #122416 0%, #0a140c 100%);
+  color: #e2e8f0; cursor: pointer; text-align: center; box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+  transition: background 0.15s, transform 0.1s; font-family: inherit;
+}
+.select-btn:hover { border-color: #44ff88; }
+.select-btn:active { background: #2a6638; color: #fff; transform: scale(0.97); }
+.select-btn.primary { border-color: #44ff88; background: linear-gradient(135deg, #1d4a29 0%, #0f2616 100%); }
+.select-btn.ghost { border-color: #3a4a3e; color: #9fb1a5; }
+.select-btn:disabled { opacity: 0.4; cursor: default; }
+input[type=text] {
+  padding: 0.7rem 1rem; font-size: 1.2rem; border: 2px solid #2a6638; border-radius: 6px;
+  background: #0a140c; color: #fff; text-align: center; width: 16rem; font-family: inherit; outline: none;
+}
+input[type=text]:focus { border-color: #44ff88; }
+#codeInput { letter-spacing: 0.3em; text-transform: uppercase; width: 11rem; }
+.msg { min-height: 1.4rem; color: #facc15; font-size: 1.05rem; text-align: center; }
+.help { color: #6f8a77; font-size: 0.95rem; text-align: center; line-height: 1.5; max-width: 60rem; }
+
+/* ロビー */
+#slotWrap { display: flex; gap: 1.5rem; width: 100%; max-width: 62rem; justify-content: center; }
+.col { flex: 1; display: flex; flex-direction: column; gap: 0.5rem; min-width: 0; }
+.colHead { font-weight: bold; font-size: 1.1rem; text-align: center; padding: 0.4rem; border-bottom: 2px solid; }
+.team0 .colHead { color: #38bdf8; border-color: #38bdf8; }
+.team1 .colHead { color: #f87171; border-color: #f87171; }
+.slot {
+  padding: 0.6rem 0.8rem; font-size: 1.05rem; text-align: left; border: 2px solid #2a3a2e; border-radius: 6px;
+  background: #0c150e; color: #dfe8e2; cursor: pointer; font-family: inherit; line-height: 1.35;
+}
+.slot span { font-size: 0.95rem; color: #8fa397; font-weight: normal; }
+.slot.taken { background: #1a1f1a; border-color: #4b5563; }
+.slot.mine { border-color: #44ff88; background: #123520; }
+.slot.mine span { color: #86efac; }
+#roomBar { display: flex; gap: 0.8rem; align-items: center; flex-wrap: wrap; justify-content: center; }
+#roomCodeText { font-size: 2rem; letter-spacing: 0.3em; color: #facc15; font-weight: bold; }
+#resultTitle { font-size: 3rem; font-weight: bold; letter-spacing: 2px; text-align: center; }
+#resultScreen { background: rgba(0, 0, 0, 0.92); }
+
+/* ---------- HUD ---------- */
+#hud, #minimapContainer, #muteBtn, .controls { display: none; }
+body.ingame #hud { display: block; }
+body.ingame #minimapContainer { display: block; }
+body.ingame #muteBtn { display: block; }
+body.ingame.touch .controls { display: flex; }
+#hud {
+  position: absolute; top: 0.6rem; left: 0.8rem; font-size: 1rem;
+  background: rgba(10, 15, 10, 0.88); padding: 0.5rem 0.8rem; border-radius: 6px; border: 1px solid #2d4a32;
+  pointer-events: none; line-height: 1.45; z-index: 10; box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+}
+#minimapContainer {
+  position: absolute; top: 0.6rem; right: 0.8rem; border: 1px solid #2d4a32; width: 18rem; height: 5.4rem;
+  background: rgba(10, 15, 10, 0.85); pointer-events: none; z-index: 10; border-radius: 4px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.5); overflow: hidden;
+}
+#minimapContainer canvas { width: 100%; height: 100%; background: transparent; }
+#muteBtn {
+  position: absolute; top: 6.4rem; right: 0.8rem; z-index: 12; width: 2.6rem; height: 2.6rem; font-size: 1.2rem;
+  background: rgba(10,15,10,0.85); border: 1px solid #2d4a32; border-radius: 6px; color: #fff; cursor: pointer; padding: 0;
+}
+#toast {
+  position: absolute; top: 18%; left: 50%; transform: translateX(-50%); z-index: 40; pointer-events: none;
+  background: rgba(0,0,0,0.85); border: 1px solid #44ff88; padding: 0.6rem 1.2rem; border-radius: 6px;
+  font-size: 1.15rem; opacity: 0; transition: opacity 0.3s; white-space: nowrap;
+}
+#toast.show { opacity: 1; }
+
+/* タッチ操作 */
+.controls {
+  position: absolute; bottom: 0.6rem; left: 0; width: 100%;
+  justify-content: space-between; align-items: flex-end; padding: 0 1rem; pointer-events: none; z-index: 10;
+}
+.btn-pad { pointer-events: auto; display: grid; grid-template-columns: repeat(3, 4.4rem); gap: 0.3rem; }
+.btn {
+  pointer-events: auto; width: 4.4rem; height: 4.4rem; background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.35); border-radius: 50%; color: white;
+  font-size: 1rem; font-weight: bold; display: flex; align-items: center; justify-content: center;
+  text-align: center; line-height: 1.1; box-shadow: 0 2px 6px rgba(0,0,0,0.6); touch-action: none;
+}
+.btn.on { background: rgba(255, 255, 255, 0.6); color: #000; }
+.action-group { pointer-events: auto; display: flex; gap: 0.5rem; align-items: flex-end; }
+#fireBtn { width: 6.4rem; height: 6.4rem; background: rgba(239, 68, 68, 0.75); border-color: #f87171; font-size: 1.4rem; }
+#smokeBtn { background: rgba(148, 163, 184, 0.4); border-color: #cbd5e1; }
+#airBtn { background: rgba(56, 189, 248, 0.4); border-color: #7dd3fc; }
+#switchBtn { background: rgba(251, 191, 36, 0.4); border-color: #fde047; }
+</style>
+</head>
+<body>
+<div id="gameContainer">
+  <div id="hud">
+    <div>自機:<span id="tankName" style="color:#4ade80;">-</span> | 武装:<span id="weaponName" style="color:#facc15;">-</span></div>
+    <div>HP: <span id="hp" style="color:#4ade80;">-</span> | 装甲(前/側/後): <span id="armorVal">-</span>mm</div>
+    <div>生存数:味方<span id="allyCount" style="color:#38bdf8;">4</span>台 vs 敵<span id="count" style="color:#f87171;">4</span>台</div>
+    <div>支援冷却:煙幕<span id="smokeCD">OK</span> | 航空支援<span id="airCD">OK</span></div>
+    <div id="netInfo" style="color:#8fb39a;"></div>
+  </div>
+  <div id="minimapContainer"><canvas id="minimapCanvas" width="280" height="84"></canvas></div>
+  <button id="muteBtn" title="音のON/OFF">🔊</button>
+  <canvas id="gameCanvas"></canvas>
+
+  <!-- メニュー -->
+  <div id="menuScreen" class="screen">
+    <h1>[ Modern Wartanks 2D Online ]</h1>
+    <p class="sub">現代戦車 4 対 4 ・ AI 戦 / オンライン協力・対戦</p>
+    <div class="row"><input type="text" id="nameInput" maxlength="12" placeholder="コールサイン(名前)"></div>
+    <div class="row">
+      <button class="select-btn primary" id="btnSolo">ソロ出撃<br><small>(AI 部隊と戦う)</small></button>
+      <button class="select-btn primary" id="btnOnline">オンライン対戦<br><small>(友達とルームで遊ぶ)</small></button>
+    </div>
+    <div class="help">PC: WASD/矢印=移動 ・ Q/E=砲塔回転 ・ マウス=照準 ・ クリック/Space=射撃 ・ R=武装切替 ・ F=煙幕 ・ G=航空支援<br>スマホ: 画面のボタンで操作(横向き推奨)</div>
+  </div>
+
+  <!-- ソロ: 陣営→車両 -->
+  <div id="soloScreen" class="screen">
+    <h1 id="soloTitle">[ 陣営選択 ]</h1>
+    <div class="row" id="soloList"></div>
+    <button class="select-btn ghost" id="soloBack">戻る</button>
+  </div>
+
+  <!-- オンライン入口 -->
+  <div id="onlineScreen" class="screen">
+    <h1>[ オンライン対戦 ]</h1>
+    <div class="row"><button class="select-btn primary" id="btnCreate">ルームを作る(ホスト)</button></div>
+    <div class="row">
+      <input type="text" id="codeInput" maxlength="5" placeholder="コード">
+      <button class="select-btn primary" id="btnJoin">ルームに参加</button>
+    </div>
+    <div class="msg" id="onlineMsg"></div>
+    <div class="help">ホストが作ったルームコード(5文字)を友達に伝えると、同じルームに入れます。<br>ホストの端末が試合を動かすので、ホストは試合中この画面を開いたままにしてください。</div>
+    <button class="select-btn ghost" id="onlineBack">戻る</button>
+  </div>
+
+  <!-- ロビー -->
+  <div id="lobbyScreen" class="screen">
+    <div id="roomBar">
+      <span>ルームコード</span><span id="roomCodeText">-----</span>
+      <button class="select-btn ghost" id="copyLinkBtn" style="padding:0.5rem 1rem">招待リンクをコピー</button>
+    </div>
+    <div class="sub" id="lobbyPlayers"></div>
+    <div id="slotWrap"></div>
+    <div class="help" id="lobbyHint"></div>
+    <div class="row">
+      <button class="select-btn primary" id="startBtn">出撃開始</button>
+      <button class="select-btn ghost" id="lobbyLeave">退出</button>
+    </div>
+  </div>
+
+  <!-- リザルト -->
+  <div id="resultScreen" class="screen">
+    <div id="resultTitle">VICTORY</div>
+    <div class="row">
+      <button class="select-btn primary" id="resultMain">ロビーに戻る</button>
+      <button class="select-btn ghost" id="resultMenu">メニューへ</button>
+    </div>
+  </div>
+
+  <!-- 操作 UI -->
+  <div class="controls">
+    <div class="btn-pad">
+      <div></div><div class="btn" id="up">前</div><div></div>
+      <div class="btn" id="left">左</div><div></div><div class="btn" id="right">右</div>
+      <div></div><div class="btn" id="down">後</div><div></div>
+    </div>
+    <div class="action-group">
+      <div class="btn" id="turretLeft">砲←</div>
+      <div class="btn" id="turretRight">砲→</div>
+      <div class="btn" id="smokeBtn">煙幕</div>
+      <div class="btn" id="airBtn">航空<br>支援</div>
+      <div class="btn" id="switchBtn">武装<br>切替</div>
+      <div class="btn" id="fireBtn">射撃</div>
+    </div>
+  </div>
+  <div id="toast"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script>
+'use strict';
+/* =====================================================================
+   Modern Wartanks 2D Online
+   - ソロ(AI戦) / オンライン(P2P: ホストが試合を計算、ゲストは入力を送信)
+   - 通信は PeerJS(WebRTC)。専用サーバーは不要です。
+   ===================================================================== */
+const $ = id => document.getElementById(id);
+const canvas = $('gameCanvas'), ctx = canvas.getContext('2d');
+const miniCanvas = $('minimapCanvas'), mctx = miniCanvas.getContext('2d');
+const MAP_WIDTH = 5000, MAP_HEIGHT = 1500;
+const VIEW_W = 1600, VIEW_H = 800;
+canvas.width = VIEW_W; canvas.height = VIEW_H;
+const STEP = 1000 / 60;
+const PEER_PREFIX = 'wtk2d-';
+
+const VEHICLE_DATA = {
+  US_JP: [
+    {id:'type90', name:'90式戦車', topSpeed:68, revSpeed:32, accel:0.12, armor:{front:720, side:220, rear:80}, hp:155, color:'#324232', contourType:'type90', era:false, weapons:[
+      {name:'120mm JM33 APFSDS', speed:23.0, pen:680, decay:0.011, reload:140, damage:68, type:'ap'},
+      {name:'120mm JM12A1 HEAT-MP', speed:16.0, pen:600, decay:0.0, reload:150, damage:78, type:'heat'}
+    ]},
+    {id:'type10', name:'10式戦車', topSpeed:72, revSpeed:72, accel:0.16, armor:{front:680, side:190, rear:60}, hp:140, color:'#3a523d', contourType:'type10', era:false, weapons:[
+      {name:'10式 120mm APFSDS', speed:24.5, pen:760, decay:0.009, reload:110, damage:65, type:'ap'},
+      {name:'120mm JM12A1 HEAT-MP', speed:16.0, pen:600, decay:0.0, reload:120, damage:78, type:'heat'}
+    ]},
+    {id:'m1a2', name:'M1A2 エイブラムス', topSpeed:65, revSpeed:34, accel:0.10, armor:{front:820, side:320, rear:100}, hp:175, color:'#6b583f', contourType:'m1a2', era:true, weapons:[
+      {name:'120mm M829A3 APFSDS', speed:22.0, pen:790, decay:0.008, reload:170, damage:82, type:'ap'},
+      {name:'120mm M830A1 HEAT-MP', speed:18.0, pen:620, decay:0.0, reload:170, damage:72, type:'heat'}
+    ]},
+    {id:'m2bradley', name:'M2A3 ブラッドレイ', topSpeed:60, revSpeed:25, accel:0.14, armor:{front:120, side:55, rear:30}, hp:100, color:'#535940', contourType:'bradley', era:true, weapons:[
+      {name:'25mm M242 APDS', speed:19.0, pen:80, decay:0.025, reload:22, damage:14, type:'apds'},
+      {name:'TOW-2B 対戦車誘導ミサイル', speed:7.0, pen:1050, decay:0.0, reload:320, damage:150, type:'tow'}
+    ]}
+  ],
+  CN: [
+    {id:'type99a', name:'99式A型戦車', topSpeed:73, revSpeed:30, accel:0.11, armor:{front:800, side:260, rear:90}, hp:165, color:'#314022', contourType:'type99a', era:true, weapons:[
+      {name:'125mm DTC10 APFSDS', speed:23.5, pen:700, decay:0.010, reload:150, damage:70, type:'ap'},
+      {name:'125mm GP128 ミサイル', speed:8.0, pen:800, decay:0.0, reload:280, damage:120, type:'tow'}
+    ]},
+    {id:'ztl11', name:'11式装輪突撃車', topSpeed:95, revSpeed:38, accel:0.18, armor:{front:160, side:45, rear:20}, hp:90, color:'#3c4c30', contourType:'ztl11', era:false, weapons:[
+      {name:'105mm APFSDS', speed:22.0, pen:520, decay:0.016, reload:90, damage:52, type:'ap'},
+      {name:'105mm HEAT', speed:16.0, pen:490, decay:0.0, reload:90, damage:58, type:'heat'}
+    ]},
+    {id:'vt4', name:'VT-4 主力戦車', topSpeed:68, revSpeed:28, accel:0.12, armor:{front:720, side:230, rear:70}, hp:150, color:'#455827', contourType:'vt4', era:true, weapons:[
+      {name:'125mm BTA2 APFSDS', speed:23.0, pen:670, decay:0.011, reload:140, damage:68, type:'ap'},
+      {name:'125mm HEAT', speed:17.0, pen:620, decay:0.0, reload:140, damage:72, type:'heat'}
+    ]},
+    {id:'type96a', name:'96式A型戦車', topSpeed:63, revSpeed:16, accel:0.10, armor:{front:620, side:170, rear:60}, hp:135, color:'#3d4c2c', contourType:'type96a', era:true, weapons:[
+      {name:'125mm APFSDS', speed:22.5, pen:570, decay:0.014, reload:150, damage:62, type:'ap'},
+      {name:'125mm HEAT', speed:17.0, pen:520, decay:0.0, reload:150, damage:68, type:'heat'}
+    ]}
+  ]
+};
+const TEAM_FACTION = ['US_JP', 'CN'];
+const FACTION_LABEL = {US_JP:'日米連合部隊 (JGSDF / US Army)', CN:'中国人民解放軍 (PLAGF)'};
+const SLOT_IDS = ['A0','A1','A2','A3','B0','B1','B2','B3'];
+const START_Y = [260, 520, 920, 1180];
+const BULLET_TYPES = ['ap', 'heat', 'apds', 'tow'];
+const AIR_GUN = {name:'航空機銃', pen:120, decay:0.01, damage:14, type:'ap'};
+const AIR_NAME = ['AH-64D アパッチ', '直-10 (Z-10)'];
+
+const obstacles = [
+  {x:1100, y:220, w:180, h:360}, {x:1100, y:880, w:180, h:360},
+  {x:2400, y:120, w:180, h:420}, {x:2400, y:920, w:180, h:420},
+  {x:3700, y:220, w:180, h:360}, {x:3700, y:880, w:180, h:360}
+];
+
+/* ---------------- 状態 ---------------- */
+let mode = 'menu';            // menu | solo | host | client
+let inGame = false, gameRunning = false;
+let tanks = [], bullets = [], smokes = [], air = [], particles = [], popups = [], decor = [];
+let over = null, overTimer = null, resultShown = false;
+let evOut = [], evNet = [];
+let myPid = 'p0', roomCode = '';
+const lobby = {slots:{}, names:{}};
+SLOT_IDS.forEach(s => lobby.slots[s] = null);
+let peer = null, hostConn = null, leaving = false;
+const guests = {}; let nextPid = 1;
+let pingMs = 0, snapT = 0, netTimer = null, netCount = 0;
+let camX = 0, camY = 0;
+const keys = {u:0, d:0, l:0, r:0, tl:0, tr:0, f:0};
+let aimScreen = null, mouseAim = false;
+let callsign = '';
+
+/* ---------------- ユーティリティ ---------------- */
+const r0 = v => Math.round(v), r1 = v => Math.round(v * 10) / 10, r2 = v => Math.round(v * 100) / 100;
+function normalizeAngle(a) { return a - Math.PI * 2 * Math.round(a / (Math.PI * 2)); }
+function cleanName(s) { return String(s || '').replace(/[<>&"'`]/g, '').trim().slice(0, 12) || 'Player'; }
+function toast(msg) {
+  const t = $('toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove('show'), 2600);
+}
+const SCREENS = ['menuScreen', 'soloScreen', 'onlineScreen', 'lobbyScreen', 'resultScreen'];
+function showScreen(id) { SCREENS.forEach(s => $(s).style.display = (s === id ? 'flex' : 'none')); }
+const _hud = {};
+function setText(id, v) { if (_hud[id] !== v) { _hud[id] = v; $(id).textContent = v; } }
+function slotTeam(id) { return id[0] === 'A' ? 0 : 1; }
+
+function loadName() { try { return localStorage.getItem('wtk_name') || ''; } catch (e) { return ''; } }
+function saveName(n) { try { localStorage.setItem('wtk_name', n); } catch (e) {} }
+
+/* ---------------- 当たり判定・視線 ---------------- */
+function collides(x, y, r) {
+  if (x - r < 0 || x + r > MAP_WIDTH || y - r < 0 || y + r > MAP_HEIGHT) return true;
+  for (const o of obstacles) if (x + r > o.x && x - r < o.x + o.w && y + r > o.y && y - r < o.y + o.h) return true;
+  return false;
+}
+function segHitsRect(x1, y1, x2, y2, r) {
+  let t0 = 0, t1 = 1; const dx = x2 - x1, dy = y2 - y1;
+  const p = [-dx, dx, -dy, dy], q = [x1 - r.x, r.x + r.w - x1, y1 - r.y, r.y + r.h - y1];
+  for (let i = 0; i < 4; i++) {
+    if (p[i] === 0) { if (q[i] < 0) return false; }
+    else {
+      const t = q[i] / p[i];
+      if (p[i] < 0) { if (t > t1) return false; if (t > t0) t0 = t; }
+      else { if (t < t0) return false; if (t < t1) t1 = t; }
+    }
+  }
+  return true;
+}
+function segNearCircle(x1, y1, x2, y2, cx, cy, r) {
+  const dx = x2 - x1, dy = y2 - y1, l2 = dx * dx + dy * dy;
+  let t = l2 ? ((cx - x1) * dx + (cy - y1) * dy) / l2 : 0;
+  t = Math.max(0, Math.min(1, t));
+  return Math.hypot(x1 + dx * t - cx, y1 + dy * t - cy) < r;
+}
+function hasLOS(x1, y1, x2, y2) {
+  for (const s of smokes) if (segNearCircle(x1, y1, x2, y2, s.x, s.y, s.radius)) return false;
+  for (const o of obstacles) if (segHitsRect(x1, y1, x2, y2, o)) return false;
+  return true;
+}
+function rayBlocked(x, y, angle, dist) {
+  const cx = x + Math.cos(angle) * dist, cy = y + Math.sin(angle) * dist;
+  if (cx < 30 || cx > MAP_WIDTH - 30 || cy < 30 || cy > MAP_HEIGHT - 30) return true;
+  return collides(cx, cy, 15);
+}
+
+/* =====================================================================
+   シミュレーション(ソロ/ホストのみで実行)
+   ===================================================================== */
+function genDecor() {
+  const d = [];
+  for (let i = 0; i < 60; i++) d.push([
+    r0(Math.random() * MAP_WIDTH),
+    r0(Math.random() > 0.5 ? Math.random() * 200 : MAP_HEIGHT - 200 + Math.random() * 200),
+    r0(Math.random() * 32 + 14), Math.random() > 0.3 ? 0 : 1
+  ]);
+  return d;
+}
+function createTank(slotId) {
+  const team = slotTeam(slotId), idx = +slotId[1];
+  const d = VEHICLE_DATA[TEAM_FACTION[team]][idx];
+  const x = team ? MAP_WIDTH - 280 : 280, y = START_Y[idx], a = team ? Math.PI : 0;
+  return {
+    ...d, slot:slotId, team, x, y, bodyAngle:a, turretAngle:a, currentSpeed:0, maxHp:d.hp,
+    wi:0, cooldown:0, avoidAngle:0, avoidTimer:0, smokeCD:0, airCD:0,
+    human:null, pname:'AI', input:null, nx:x, ny:y, nba:a, nta:a
+  };
+}
+function initSim() {
+  tanks = SLOT_IDS.map(createTank);
+  bullets = []; smokes = []; air = []; particles = []; popups = [];
+  over = null; resultShown = false; clearTimeout(overTimer);
+  evOut.length = 0; evNet.length = 0;
+  tanks.forEach(t => {
+    const pid = lobby.slots[t.slot];
+    t.human = pid || null; t.pname = pid ? (lobby.names[pid] || 'Player') : 'AI';
+  });
+}
+function tryMove(t, sp) {
+  const nx = t.x + Math.cos(t.bodyAngle) * sp, ny = t.y + Math.sin(t.bodyAngle) * sp;
+  if (!collides(nx, ny, 24)) { t.x = nx; t.y = ny; }
+  else if (!collides(nx, t.y, 24)) t.x = nx;
+  else if (!collides(t.x, ny, 24)) t.y = ny;
+  else t.currentSpeed *= 0.3;
+}
+function humanControl(t) {
+  const k = t.input; if (!k) return;
+  if (k.l) t.bodyAngle -= 0.035;
+  if (k.r) t.bodyAngle += 0.035;
+  let ts = 0;
+  if (k.u) ts = t.topSpeed / 16;
+  if (k.d) ts = -t.revSpeed / 16;
+  t.currentSpeed += (ts - t.currentSpeed) * t.accel;
+  tryMove(t, t.currentSpeed);
+  if (k.tl) t.turretAngle -= 0.045;
+  if (k.tr) t.turretAngle += 0.045;
+  if (typeof k.a === 'number' && !k.tl && !k.tr) {
+    const d = normalizeAngle(k.a - t.turretAngle);
+    t.turretAngle += Math.max(-0.06, Math.min(0.06, d));
+  }
+  if (k.f && t.cooldown <= 0) shoot(t);
+}
+function chooseWeapon(t, e, d) {
+  let best = t.wi, bs = -1;
+  t.weapons.forEach((w, i) => {
+    const pen = w.pen * Math.max(0.3, 1 - (d / 110) * w.decay);
+    const s = (pen >= e.armor.front ? w.damage : 5) / w.reload;
+    if (s > bs) { bs = s; best = i; }
+  });
+  t.wi = best;
+}
+function aiControl(t) {
+  let ne = null, md = 1e9;
+  for (const e of tanks) {
+    if (e.hp <= 0 || e.team === t.team) continue;
+    const d = Math.hypot(e.x - t.x, e.y - t.y);
+    if (d < md) { md = d; ne = e; }
+  }
+  if (ne && md < 1300 && hasLOS(t.x, t.y, ne.x, ne.y)) {
+    const aim = Math.atan2(ne.y - t.y, ne.x - t.x) + (Math.random() - 0.5) * 0.03;
+    const diff = normalizeAngle(aim - t.turretAngle);
+    t.turretAngle += Math.max(-0.06, Math.min(0.06, diff * 0.12));
+    if (Math.abs(diff) < 0.07 && t.cooldown <= 0) { chooseWeapon(t, ne, md); shoot(t); }
+  }
+  const sp = t.topSpeed / 32;
+  if (t.avoidTimer > 0) {
+    t.avoidTimer--; t.bodyAngle += t.avoidAngle; tryMove(t, sp);
+  } else if (rayBlocked(t.x, t.y, t.bodyAngle, 120)) {
+    t.avoidAngle = Math.random() > 0.5 ? 0.08 : -0.08; t.avoidTimer = 40;
+  } else if (ne && md > 380) {
+    const ta = Math.atan2(ne.y - t.y, ne.x - t.x);
+    t.bodyAngle += Math.max(-0.04, Math.min(0.04, normalizeAngle(ta - t.bodyAngle) * 0.05));
+    tryMove(t, sp);
+  }
+}
+function shoot(t) {
+  const w = t.weapons[t.wi]; let target = null;
+  if (w.type === 'tow') {
+    let bd = 0.35;
+    for (const e of tanks) {
+      if (e.hp <= 0 || e.team === t.team) continue;
+      const d = Math.abs(normalizeAngle(Math.atan2(e.y - t.y, e.x - t.x) - t.turretAngle));
+      if (d < bd) { bd = d; target = e; }
+    }
+  }
+  const c = Math.cos(t.turretAngle), s = Math.sin(t.turretAngle);
+  bullets.push({x:t.x + c * 44, y:t.y + s * 44, vx:c * w.speed, vy:s * w.speed, d:0, w, type:w.type, team:t.team, target, air:false});
+  t.cooldown = w.reload;
+  evOut.push(['m', r1(t.x), r1(t.y), r2(t.turretAngle)]);
+}
+function popupEv(x, y, text, color) { evOut.push(['p', r0(x), r0(y), text, color]); }
+function deploySmoke(t) {
+  if (t.hp <= 0 || t.smokeCD > 0) return;
+  t.smokeCD = 450;
+  const arr = [];
+  for (let i = 0; i < 25; i++) arr.push([r0(t.x + (Math.random() - 0.5) * 160), r0(t.y + (Math.random() - 0.5) * 160), r0(Math.random() * 50 + 35)]);
+  arr.forEach(a => smokes.push({x:a[0], y:a[1], radius:a[2], life:380}));
+  evOut.push(['sm', arr]);
+  popupEv(t.x, t.y - 35, '煙幕展開 (SMOKE SCREEN)', '#ffffff');
+}
+function callAir(t) {
+  if (t.hp <= 0 || t.airCD > 0) return;
+  t.airCD = 900;
+  const dir = t.team ? -1 : 1;
+  air.push({x:t.team ? MAP_WIDTH + 200 : -200, y:Math.max(100, Math.min(MAP_HEIGHT - 100, t.y - 140)), team:t.team, dir, t:0});
+  popupEv(t.x, t.y - 45, '航空支援要請: ' + AIR_NAME[t.team], '#38bdf8');
+}
+function applyAct(t, a) {
+  if (!t || t.hp <= 0) return;
+  if (a === 'sw') { if (t.weapons.length > 1) t.wi = (t.wi + 1) % t.weapons.length; }
+  else if (a === 'sm') deploySmoke(t);
+  else if (a === 'air') callAir(t);
+}
+function separateTanks() {
+  for (let i = 0; i < tanks.length; i++) {
+    const a = tanks[i]; if (a.hp <= 0) continue;
+    for (let j = i + 1; j < tanks.length; j++) {
+      const b = tanks[j]; if (b.hp <= 0) continue;
+      const dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy);
+      if (d < 46 && d > 0.01) {
+        const push = (46 - d) / 2, ux = dx / d, uy = dy / d;
+        if (!collides(a.x - ux * push, a.y - uy * push, 24)) { a.x -= ux * push; a.y -= uy * push; }
+        if (!collides(b.x + ux * push, b.y + uy * push, 24)) { b.x += ux * push; b.y += uy * push; }
+      }
+    }
+  }
+}
+function stepBullets() {
+  for (let i = bullets.length - 1; i >= 0; i--) {
+    const b = bullets[i];
+    if (b.type === 'tow' && b.target && b.target.hp > 0) {
+      const ta = Math.atan2(b.target.y - b.y, b.target.x - b.x), ca = Math.atan2(b.vy, b.vx);
+      const diff = normalizeAngle(ta - ca), na = ca + Math.sign(diff) * Math.min(Math.abs(diff), 0.05);
+      const sp = Math.hypot(b.vx, b.vy);
+      b.vx = Math.cos(na) * sp; b.vy = Math.sin(na) * sp;
+    }
+    b.x += b.vx; b.y += b.vy; b.d += Math.hypot(b.vx, b.vy);
+    if (b.x < 0 || b.x > MAP_WIDTH || b.y < 0 || b.y > MAP_HEIGHT || b.d > 4200) { bullets.splice(i, 1); continue; }
+    if (!b.air && collides(b.x, b.y, 2)) { evOut.push(['x', r0(b.x), r0(b.y), 0]); bullets.splice(i, 1); continue; }
+    for (const t of tanks) {
+      if (t.hp <= 0 || t.team === b.team) continue;
+      if (Math.hypot(b.x - t.x, b.y - t.y) >= 28) continue;
+      const hitAngle = Math.abs(normalizeAngle(Math.atan2(b.vy, b.vx) - t.bodyAngle));
+      let part = '側面', armor = t.armor.side;
+      if (hitAngle < Math.PI * 0.25) { part = '背面'; armor = t.armor.rear; }
+      else if (hitAngle > Math.PI * 0.75) { part = '前面'; armor = t.armor.front; }
+      const pen = b.w.pen * Math.max(0.3, 1 - (b.d / 110) * b.w.decay);
+      if (pen >= armor) {
+        t.hp -= b.w.damage; evOut.push(['x', r0(b.x), r0(b.y), 1]);
+        popupEv(t.x, t.y, part + '貫通! -' + b.w.damage, '#ef4444');
+      } else {
+        t.hp -= 5; evOut.push(['x', r0(b.x), r0(b.y), 0]);
+        popupEv(t.x, t.y, '非貫通 (NON-PEN)', '#facc15');
+      }
+      if (t.hp <= 0) {
+        t.hp = 0; t.currentSpeed = 0; t.input = null;
+        evOut.push(['x', r0(t.x), r0(t.y), 1]); popupEv(t.x, t.y - 20, '撃破!', '#fb923c');
+      }
+      bullets.splice(i, 1); break;
+    }
+  }
+}
+function stepAir() {
+  for (let i = air.length - 1; i >= 0; i--) {
+    const a = air[i]; a.x += a.dir * 8; a.t++;
+    if (a.t % 10 === 0 && a.x > 200 && a.x < MAP_WIDTH - 200) {
+      const c = tanks.filter(t => t.hp > 0 && t.team !== a.team && Math.hypot(t.x - a.x, t.y - a.y) < 1000);
+      if (c.length) {
+        const g = c[Math.floor(Math.random() * c.length)], ang = Math.atan2(g.y - a.y, g.x - a.x);
+        bullets.push({x:a.x, y:a.y, vx:Math.cos(ang) * 26, vy:Math.sin(ang) * 26, d:0, w:AIR_GUN, type:'ap', team:a.team, target:null, air:true});
+      }
+    }
+    if (a.x > MAP_WIDTH + 300 || a.x < -300) air.splice(i, 1);
+  }
+}
+function checkOver() {
+  let a = 0, b = 0;
+  for (const t of tanks) if (t.hp > 0) { if (t.team) b++; else a++; }
+  if (a === 0 || b === 0) { over = {w: (a === 0 && b === 0) ? -1 : (a === 0 ? 1 : 0)}; scheduleResult(); }
+}
+function simStep() {
+  if (over) return;
+  for (const t of tanks) {
+    if (t.hp <= 0) continue;
+    if (t.cooldown > 0) t.cooldown--;
+    if (t.smokeCD > 0) t.smokeCD--;
+    if (t.airCD > 0) t.airCD--;
+    if (t.human) humanControl(t); else aiControl(t);
+    t.bodyAngle = normalizeAngle(t.bodyAngle); t.turretAngle = normalizeAngle(t.turretAngle);
+  }
+  separateTanks(); stepBullets(); stepAir();
+  for (let i = smokes.length - 1; i >= 0; i--) if (--smokes[i].life <= 0) smokes.splice(i, 1);
+  checkOver();
+}
+
+/* ---------------- イベント(見た目・音) ---------------- */
+function applyEvent(e) {
+  switch (e[0]) {
+    case 'm': muzzle(e[1], e[2], e[3]); break;
+    case 'x': createExplosion(e[1], e[2], !!e[3]); break;
+    case 'p': popups.push({x:e[1], y:e[2], text:e[3], color:e[4], life:55}); break;
+    case 'sm': if (mode === 'client') for (const a of e[1]) smokes.push({x:a[0], y:a[1], radius:a[2], life:380}); break;
+    case 'hu': if (tanks[e[1]]) { tanks[e[1]].human = null; tanks[e[1]].pname = 'AI'; } break;
+  }
+}
+function drainEvents() {
+  const hasGuests = Object.keys(guests).length > 0;
+  for (const e of evOut) { applyEvent(e); if (hasGuests) evNet.push(e); }
+  evOut.length = 0;
+}
+function muzzle(x, y, ang) {
+  for (let i = 0; i < 8; i++) {
+    particles.push({
+      x:x + Math.cos(ang) * 48, y:y + Math.sin(ang) * 48,
+      vx:Math.cos(ang + (Math.random() - 0.5) * 0.5) * (Math.random() * 8 + 2),
+      vy:Math.sin(ang + (Math.random() - 0.5) * 0.5) * (Math.random() * 8 + 2),
+      size:Math.random() * 6 + 2, color:'#ffb703', life:10
+    });
+  }
+  sfx('shot', x, y);
+}
+function createExplosion(x, y, big) {
+  const n = big ? 36 : 14;
+  for (let i = 0; i < n; i++) {
+    const a = Math.random() * Math.PI * 2, s = Math.random() * (big ? 9 : 4) + 1;
+    particles.push({x, y, vx:Math.cos(a) * s, vy:Math.sin(a) * s, size:Math.random() * (big ? 14 : 5) + 2,
+      color:Math.random() > 0.3 ? '#ff5400' : '#ffcc00', life:Math.random() * 25 + 15});
+  }
+  sfx(big ? 'boom' : 'hit', x, y);
+}
+
+/* ---------------- 音(合成音) ---------------- */
+let actx = null, muted = false; const lastSfx = {};
+function initAudio() {
+  try {
+    if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
+    if (actx && actx.state === 'suspended') actx.resume();
+  } catch (e) {}
+}
+function sfx(kind, x, y) {
+  if (!actx || muted) return;
+  const now = actx.currentTime;
+  if (now - (lastSfx[kind] || 0) < 0.04) return;
+  lastSfx[kind] = now;
+  const cx = VIEW_W / 2 - camX, cy = VIEW_H / 2 - camY;
+  const v = Math.max(0, 1 - Math.hypot(x - cx, y - cy) / 1800);
+  if (v < 0.03) return;
+  const dur = kind === 'boom' ? 0.6 : 0.25, n = Math.floor(actx.sampleRate * dur);
+  const buf = actx.createBuffer(1, n, actx.sampleRate), d = buf.getChannelData(0);
+  for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, 2.5);
+  const src = actx.createBufferSource(); src.buffer = buf;
+  const f = actx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = kind === 'boom' ? 500 : (kind === 'hit' ? 900 : 1500);
+  const g = actx.createGain(); g.gain.value = v * (kind === 'boom' ? 0.6 : 0.35);
+  src.connect(f); f.connect(g); g.connect(actx.destination); src.start();
+}
+
+/* =====================================================================
+   ネットワーク (PeerJS)
+   ===================================================================== */
+function makeCode() {
+  const ch = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'; let s = '';
+  for (let i = 0; i < 5; i++) s += ch[Math.floor(Math.random() * ch.length)];
+  return s;
+}
+function setOnlineMsg(m) { $('onlineMsg').textContent = m || ''; }
+function broadcast(m) { for (const pid in guests) { try { guests[pid].send(m); } catch (e) {} } }
+function lobbyMsg() { return {t:'lobby', slots:lobby.slots, names:lobby.names, code:roomCode}; }
+function broadcastLobby() { broadcast(lobbyMsg()); }
+function cleanupNet() {
+  leaving = true;
+  clearInterval(netTimer); netTimer = null;
+  for (const pid in guests) { try { guests[pid].close(); } catch (e) {} delete guests[pid]; }
+  try { if (hostConn) hostConn.close(); } catch (e) {}
+  try { if (peer) peer.destroy(); } catch (e) {}
+  peer = null; hostConn = null; leaving = false;
+}
+function resetLobby() {
+  SLOT_IDS.forEach(s => lobby.slots[s] = null);
+  lobby.names = {p0:callsign}; nextPid = 1;
+}
+
+/* --- ホスト --- */
+function createRoom() {
+  if (typeof Peer === 'undefined') { setOnlineMsg('通信ライブラリを読み込めませんでした。ネット接続を確認して再読み込みしてください。'); return; }
+  cleanupNet(); mode = 'host'; setOnlineMsg('ルームを作成中…'); openHostPeer(0);
+}
+function openHostPeer(n) {
+  const code = makeCode(); const p = new Peer(PEER_PREFIX + code); peer = p;
+  p.on('open', () => {
+    roomCode = code; myPid = 'p0'; resetLobby(); gameRunning = false;
+    $('roomCodeText').textContent = code; showScreen('lobbyScreen'); renderLobby();
+  });
+  p.on('connection', onGuestConnect);
+  p.on('disconnected', () => { try { p.reconnect(); } catch (e) {} });
+  p.on('error', e => {
+    if (e.type === 'unavailable-id' && n < 5) { try { p.destroy(); } catch (x) {} openHostPeer(n + 1); }
+    else if (peer === p && !roomCode) { setOnlineMsg('通信エラー: ' + e.type); mode = 'menu'; }
+  });
+}
+function onGuestConnect(c) {
+  c.on('open', () => {
+    if (gameRunning) { c.send({t:'full', r:'試合中のため参加できません'}); setTimeout(() => { try { c.close(); } catch (e) {} }, 400); return; }
+    if (Object.keys(guests).length >= 7) { c.send({t:'full', r:'ルームが満員です'}); setTimeout(() => { try { c.close(); } catch (e) {} }, 400); return; }
+    const pid = 'p' + (nextPid++); c.pid = pid; guests[pid] = c;
+    lobby.names[pid] = 'Player';
+    c.send({t:'welcome', pid});
+    broadcastLobby(); renderLobby();
+  });
+  c.on('data', m => { try { onHostMsg(c, m); } catch (e) { console.error(e); } });
+  c.on('close', () => onGuestLeft(c));
+  c.on('error', () => onGuestLeft(c));
+}
+function onGuestLeft(c) {
+  const pid = c.pid; if (!pid || !guests[pid]) return;
+  delete guests[pid];
+  const name = lobby.names[pid] || 'Player';
+  for (const s of SLOT_IDS) if (lobby.slots[s] === pid) lobby.slots[s] = null;
+  delete lobby.names[pid];
+  if (gameRunning) {
+    tanks.forEach((t, i) => { if (t.human === pid) { t.human = null; t.pname = 'AI'; t.input = null; evOut.push(['hu', i]); } });
+    toast(name + ' が切断しました(AI が引き継ぎ)');
+  } else { broadcastLobby(); renderLobby(); }
+}
+function sanitizeInput(k) {
+  k = k || {};
+  return {u:!!k.u, d:!!k.d, l:!!k.l, r:!!k.r, tl:!!k.tl, tr:!!k.tr, f:!!k.f, a:(typeof k.a === 'number' && isFinite(k.a)) ? k.a : null};
+}
+function claim(pid, slot) {
+  if (!(slot in lobby.slots)) return;
+  if (lobby.slots[slot] === pid) { lobby.slots[slot] = null; return; }
+  if (lobby.slots[slot]) return;
+  for (const s of SLOT_IDS) if (lobby.slots[s] === pid) lobby.slots[s] = null;
+  lobby.slots[slot] = pid;
+}
+function onHostMsg(c, m) {
+  if (!m || typeof m !== 'object' || !c.pid) return;
+  const pid = c.pid;
+  switch (m.t) {
+    case 'hello': lobby.names[pid] = cleanName(m.n); if (!gameRunning) { broadcastLobby(); renderLobby(); } break;
+    case 'claim': if (!gameRunning) { claim(pid, String(m.s)); broadcastLobby(); renderLobby(); } break;
+    case 'in': { if (!gameRunning) break; const t = tanks.find(x => x.human === pid); if (t && t.hp > 0) t.input = sanitizeInput(m.k); break; }
+    case 'act': { if (!gameRunning) break; const t = tanks.find(x => x.human === pid); if (t) applyAct(t, m.a); break; }
+    case 'ping': c.send({t:'pong', ts:m.ts}); break;
+  }
+}
+function hostStart() {
+  if (mode !== 'host' || gameRunning) return;
+  decor = genDecor(); gameRunning = true; initSim();
+  broadcast({t:'start', slots:lobby.slots, names:lobby.names, decor});
+  enterGame();
+}
+function hostBackToLobby() {
+  gameRunning = false; inGame = false; document.body.classList.remove('ingame');
+  tanks = []; showScreen('lobbyScreen'); renderLobby(); broadcastLobby();
+}
+
+/* --- ゲスト --- */
+function joinRoom(raw) {
+  const code = String(raw || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  if (code.length < 4) { setOnlineMsg('ルームコードを入力してください'); return; }
+  if (typeof Peer === 'undefined') { setOnlineMsg('通信ライブラリを読み込めませんでした。ネット接続を確認して再読み込みしてください。'); return; }
+  cleanupNet(); mode = 'client'; roomCode = code; setOnlineMsg('接続中…');
+  let welcomed = false;
+  const fail = msg => { if (welcomed) return; clearTimeout(timer); setOnlineMsg(msg); cleanupNet(); mode = 'menu'; };
+  const timer = setTimeout(() => fail('接続がタイムアウトしました。コードを確認して、もう一度お試しください'), 15000);
+  const p = new Peer(); peer = p;
+  p.on('open', () => {
+    const c = p.connect(PEER_PREFIX + code, {reliable:true, serialization:'json'}); hostConn = c;
+    c.on('data', m => {
+      if (m && m.t === 'welcome') { welcomed = true; clearTimeout(timer); }
+      try { onClientMsg(m); } catch (e) { console.error(e); }
+    });
+    c.on('close', () => { if (welcomed && !leaving) hostLost(); });
+    c.on('error', () => { if (welcomed && !leaving) hostLost(); });
+  });
+  p.on('error', e => {
+    if (welcomed) { if (!leaving) hostLost(); return; }
+    fail(e.type === 'peer-unavailable' ? 'ルームが見つかりません(コードを確認してください)' : '通信エラー: ' + e.type);
+  });
+}
+function hostLost() {
+  clearInterval(netTimer); inGame = false; mode = 'menu';
+  document.body.classList.remove('ingame');
+  showResultScreen('ホストとの接続が切れました', '#f87171', false);
+}
+function onClientMsg(m) {
+  if (!m) return;
+  switch (m.t) {
+    case 'welcome': myPid = m.pid; hostConn.send({t:'hello', n:callsign}); break;
+    case 'full': setOnlineMsg(m.r || '参加できません'); mode = 'menu'; cleanupNet(); break;
+    case 'lobby':
+      lobby.slots = m.slots; lobby.names = m.names; roomCode = m.code || roomCode;
+      $('roomCodeText').textContent = roomCode;
+      if (inGame || resultShown || $('onlineScreen').style.display === 'flex' || $('resultScreen').style.display === 'flex') {
+        inGame = false; resultShown = false; document.body.classList.remove('ingame'); clearInterval(netTimer);
+      }
+      showScreen('lobbyScreen'); renderLobby(); break;
+    case 'start':
+      lobby.slots = m.slots; lobby.names = m.names; decor = m.decor; initSim(); enterGame(); break;
+    case 's': applySnapshot(m); break;
+    case 'pong': pingMs = Date.now() - m.ts; break;
+  }
+}
+function buildSnap() {
+  return {
+    t:'s',
+    T:tanks.map(t => [r1(t.x), r1(t.y), r2(t.bodyAngle), r2(t.turretAngle), Math.max(0, Math.ceil(t.hp)), t.cooldown, t.wi, r2(t.currentSpeed), t.smokeCD, t.airCD]),
+    B:bullets.map(b => [r1(b.x), r1(b.y), r1(b.vx), r1(b.vy), BULLET_TYPES.indexOf(b.type)]),
+    A:air.map(a => [r0(a.x), r0(a.y), a.team, a.t, a.dir]),
+    E:evNet.splice(0),
+    O:over ? over.w : null
+  };
+}
+function applySnapshot(m) {
+  if (!inGame || !m.T) return;
+  snapT = performance.now();
+  m.T.forEach((a, i) => {
+    const t = tanks[i]; if (!t) return;
+    t.nx = a[0]; t.ny = a[1]; t.nba = a[2]; t.nta = a[3];
+    t.hp = a[4]; t.cooldown = a[5]; t.wi = a[6]; t.currentSpeed = a[7]; t.smokeCD = a[8]; t.airCD = a[9];
+  });
+  bullets = m.B.map(b => ({x:b[0], y:b[1], vx:b[2], vy:b[3], type:BULLET_TYPES[b[4]] || 'ap'}));
+  air = m.A.map(a => ({x:a[0], y:a[1], team:a[2], t:a[3], dir:a[4]}));
+  for (const e of m.E) applyEvent(e);
+  if (m.O !== null && m.O !== undefined && !over) { over = {w:m.O}; scheduleResult(); }
+}
+
+/* =====================================================================
+   入力
+   ===================================================================== */
+function myTank() { return tanks.find(t => t.human === myPid) || null; }
+function viewTank() {
+  const m = myTank(); if (m && m.hp > 0) return m;
+  const team = m ? m.team : 0;
+  return tanks.find(t => t.hp > 0 && t.team === team) || m || tanks[0];
+}
+function buildInput() {
+  let a = null; const me = myTank();
+  if (mouseAim && aimScreen && me) {
+    const rect = canvas.getBoundingClientRect();
+    const wx = (aimScreen.x - rect.left) / rect.width * VIEW_W - camX;
+    const wy = (aimScreen.y - rect.top) / rect.height * VIEW_H - camY;
+    a = r2(Math.atan2(wy - me.y, wx - me.x));
+  }
+  return {u:!!keys.u, d:!!keys.d, l:!!keys.l, r:!!keys.r, tl:!!keys.tl, tr:!!keys.tr, f:!!keys.f, a};
+}
+function doAct(a) {
+  if (!inGame || over) return;
+  if (mode === 'client') { if (hostConn && hostConn.open) hostConn.send({t:'act', a}); }
+  else applyAct(myTank(), a);
+}
+const KEYMAP = {ArrowUp:'u', KeyW:'u', ArrowDown:'d', KeyS:'d', ArrowLeft:'l', KeyA:'l', ArrowRight:'r', KeyD:'r', KeyQ:'tl', KeyE:'tr', Space:'f'};
+window.addEventListener('keydown', e => {
+  initAudio();
+  if (!inGame) return;
+  const k = KEYMAP[e.code];
+  if (k) { keys[k] = 1; if (k === 'tl' || k === 'tr') mouseAim = false; e.preventDefault(); return; }
+  if (e.repeat) return;
+  if (e.code === 'KeyR' || e.code === 'KeyX') doAct('sw');
+  else if (e.code === 'KeyF') doAct('sm');
+  else if (e.code === 'KeyG') doAct('air');
+});
+window.addEventListener('keyup', e => { const k = KEYMAP[e.code]; if (k) keys[k] = 0; });
+window.addEventListener('blur', () => { for (const k in keys) keys[k] = 0; });
+window.addEventListener('pointerdown', initAudio);
+canvas.addEventListener('contextmenu', e => e.preventDefault());
+canvas.addEventListener('pointermove', e => { if (e.pointerType === 'mouse') { aimScreen = {x:e.clientX, y:e.clientY}; mouseAim = true; } });
+canvas.addEventListener('pointerdown', e => { if (e.pointerType === 'mouse' && e.button === 0) { aimScreen = {x:e.clientX, y:e.clientY}; mouseAim = true; keys.f = 1; } });
+window.addEventListener('pointerup', e => { if (e.pointerType === 'mouse') keys.f = 0; });
+document.addEventListener('gesturestart', e => e.preventDefault());
+
+function bindHold(id, key) {
+  const el = $(id);
+  const down = e => { e.preventDefault(); try { el.setPointerCapture(e.pointerId); } catch (x) {} keys[key] = 1; el.classList.add('on'); };
+  const up = e => { e.preventDefault(); keys[key] = 0; el.classList.remove('on'); };
+  el.addEventListener('pointerdown', down);
+  ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(ev => el.addEventListener(ev, up));
+}
+function bindTap(id, act) {
+  const el = $(id);
+  el.addEventListener('pointerdown', e => { e.preventDefault(); el.classList.add('on'); doAct(act); });
+  ['pointerup', 'pointercancel', 'pointerleave'].forEach(ev => el.addEventListener(ev, () => el.classList.remove('on')));
+}
+bindHold('up', 'u'); bindHold('down', 'd'); bindHold('left', 'l'); bindHold('right', 'r');
+bindHold('turretLeft', 'tl'); bindHold('turretRight', 'tr'); bindHold('fireBtn', 'f');
+bindTap('smokeBtn', 'sm'); bindTap('airBtn', 'air'); bindTap('switchBtn', 'sw');
+if ((window.matchMedia && matchMedia('(pointer: coarse)').matches) || 'ontouchstart' in window) document.body.classList.add('touch');
+$('muteBtn').addEventListener('click', () => { muted = !muted; $('muteBtn').textContent = muted ? '🔇' : '🔊'; });
+
+/* =====================================================================
+   メニュー・ロビー UI
+   ===================================================================== */
+function readName() {
+  callsign = cleanName($('nameInput').value); $('nameInput').value = callsign; saveName(callsign);
+}
+$('nameInput').value = loadName() || ('Player' + (100 + Math.floor(Math.random() * 900)));
+$('btnSolo').onclick = () => { readName(); showSoloFaction(); };
+$('btnOnline').onclick = () => { readName(); setOnlineMsg(''); showScreen('onlineScreen'); };
+$('onlineBack').onclick = () => { cleanupNet(); mode = 'menu'; showScreen('menuScreen'); };
+$('btnCreate').onclick = () => { readName(); createRoom(); };
+$('btnJoin').onclick = () => { readName(); joinRoom($('codeInput').value); };
+$('soloBack').onclick = () => showScreen('menuScreen');
+$('lobbyLeave').onclick = () => { location.href = location.pathname; };
+$('resultMenu').onclick = () => { location.href = location.pathname; };
+$('startBtn').onclick = hostStart;
+$('resultMain').onclick = () => { if (mode === 'host') hostBackToLobby(); else location.href = location.pathname; };
+$('copyLinkBtn').onclick = () => {
+  const url = location.origin + location.pathname + '?room=' + roomCode;
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url).then(() => toast('招待リンクをコピーしました'), () => prompt('招待リンク', url));
+  else prompt('招待リンク', url);
+};
+
+function showSoloFaction() {
+  $('soloTitle').textContent = '[ 陣営選択 ]';
+  const list = $('soloList'); list.textContent = '';
+  [0, 1].forEach(team => {
+    const b = document.createElement('button'); b.className = 'select-btn'; b.textContent = FACTION_LABEL[TEAM_FACTION[team]];
+    b.onclick = () => showSoloVehicles(team); list.appendChild(b);
+  });
+  showScreen('soloScreen');
+}
+function showSoloVehicles(team) {
+  $('soloTitle').textContent = '[ 小隊長機(プレイヤー車両)の選択 ]';
+  const list = $('soloList'); list.textContent = '';
+  VEHICLE_DATA[TEAM_FACTION[team]].forEach((v, idx) => {
+    const b = document.createElement('button'); b.className = 'select-btn';
+    const n = document.createElement('b'); n.textContent = v.name;
+    b.append(n, document.createElement('br'), document.createTextNode('最高速:' + v.topSpeed + 'km/h / 装甲:' + v.armor.front + 'mm'));
+    b.onclick = () => startSolo((team ? 'B' : 'A') + idx); list.appendChild(b);
+  });
+}
+function startSolo(slot) {
+  cleanupNet(); mode = 'solo'; myPid = 'p0'; resetLobby(); lobby.slots[slot] = 'p0';
+  decor = genDecor(); gameRunning = true; initSim(); enterGame();
+}
+function claimSlot(id) {
+  if (mode === 'host') { claim('p0', id); renderLobby(); broadcastLobby(); }
+  else if (hostConn && hostConn.open) hostConn.send({t:'claim', s:id});
+}
+function renderLobby() {
+  const wrap = $('slotWrap'); wrap.textContent = '';
+  [0, 1].forEach(team => {
+    const col = document.createElement('div'); col.className = 'col team' + team;
+    const h = document.createElement('div'); h.className = 'colHead'; h.textContent = FACTION_LABEL[TEAM_FACTION[team]]; col.appendChild(h);
+    VEHICLE_DATA[TEAM_FACTION[team]].forEach((v, idx) => {
+      const id = (team ? 'B' : 'A') + idx, pid = lobby.slots[id];
+      const b = document.createElement('button'); b.className = 'slot' + (pid ? ' taken' : '') + (pid === myPid ? ' mine' : '');
+      const n = document.createElement('b'); n.textContent = v.name;
+      const s = document.createElement('span');
+      s.textContent = pid ? ('👤 ' + (lobby.names[pid] || '?') + (pid === myPid ? '(あなた)' : '')) : '🤖 AI(クリックで搭乗)';
+      b.append(n, document.createElement('br'), s); b.onclick = () => claimSlot(id); col.appendChild(b);
+    });
+    wrap.appendChild(col);
+  });
+  const names = Object.keys(lobby.names).map(p => lobby.names[p]);
+  $('lobbyPlayers').textContent = '参加者 ' + names.length + '人: ' + names.join(', ');
+  $('startBtn').style.display = mode === 'host' ? '' : 'none';
+  $('lobbyHint').textContent = mode === 'host'
+    ? '乗りたい車両をクリックしてください(もう一度押すと降りる)。空き枠は AI が操縦します。チームは自由に分かれて OK(協力も対戦も可)。準備ができたら「出撃開始」。'
+    : '乗りたい車両をクリックして、ホストの「出撃開始」を待ってください。';
+}
+
+/* =====================================================================
+   ゲーム進行・描画
+   ===================================================================== */
+let lastTs = 0, acc = 0, netTick = 0;
+function enterGame() {
+  inGame = true; resultShown = false; document.body.classList.add('ingame'); showScreen(null);
+  lastTs = performance.now(); acc = 0; snapT = performance.now();
+  for (const k in keys) keys[k] = 0;
+  try { if (navigator.wakeLock) navigator.wakeLock.request('screen').catch(() => {}); } catch (e) {}
+  clearInterval(netTimer); netCount = 0;
+  if (mode === 'client') {
+    netTimer = setInterval(() => {
+      if (!inGame || !hostConn || !hostConn.open) return;
+      hostConn.send({t:'in', k:buildInput()});
+      if (++netCount % 40 === 0) hostConn.send({t:'ping', ts:Date.now()});
+    }, 50);
+  }
+  const me = myTank();
+  if (me) {
+    setText('tankName', me.name);
+    setText('armorVal', me.armor.front + '/' + me.armor.side + '/' + me.armor.rear);
+  } else { setText('tankName', '観戦中'); setText('armorVal', '-'); }
+}
+function scheduleResult() {
+  clearTimeout(overTimer);
+  overTimer = setTimeout(() => {
+    if (resultShown) return; resultShown = true;
+    const me = myTank(), myTeam = me ? me.team : 0;
+    let title, color;
+    if (over.w === -1) { title = 'DRAW (相討ち)'; color = '#facc15'; }
+    else if (over.w === myTeam) { title = 'VICTORY (作戦成功・敵殲滅)'; color = '#4ade80'; }
+    else { title = 'DEFEAT (作戦失敗・自部隊壊滅)'; color = '#f87171'; }
+    showResultScreen(title, color, true);
+  }, 1800);
+}
+function showResultScreen(title, color, canMain) {
+  $('resultTitle').textContent = title; $('resultTitle').style.color = color;
+  const main = $('resultMain');
+  if (mode === 'host') { main.style.display = ''; main.textContent = 'ロビーに戻る'; }
+  else if (mode === 'solo') { main.style.display = ''; main.textContent = '作戦再出撃'; }
+  else if (mode === 'client' && canMain) { main.style.display = 'none'; $('resultTitle').textContent = title + '\n(ホストの操作待ち)'; $('resultTitle').style.whiteSpace = 'pre-line'; }
+  else main.style.display = 'none';
+  showScreen('resultScreen');
+}
+
+function frame(ts) {
+  requestAnimationFrame(frame);
+  if (!inGame || !tanks.length) return;
+  const dt = Math.min(100, ts - lastTs); lastTs = ts;
+  const fr = dt / STEP;
+  if (mode !== 'client') {
+    const me = myTank(); if (me && me.hp > 0) me.input = buildInput();
+    acc += dt; let n = 0;
+    while (acc >= STEP && n < 6) {
+      simStep(); drainEvents(); acc -= STEP; n++;
+      if ((++netTick % 2) === 0 && Object.keys(guests).length) broadcast(buildSnap());
+    }
+    if (n === 6) acc = 0;
+  } else {
+    for (const t of tanks) {
+      t.x += (t.nx - t.x) * 0.4; t.y += (t.ny - t.y) * 0.4;
+      t.bodyAngle += normalizeAngle(t.nba - t.bodyAngle) * 0.4;
+      t.turretAngle += normalizeAngle(t.nta - t.turretAngle) * 0.4;
+    }
+    for (let i = smokes.length - 1; i >= 0; i--) { smokes[i].life -= fr; if (smokes[i].life <= 0) smokes.splice(i, 1); }
+  }
+  render(fr);
+}
+
+function render(fr) {
+  const me = viewTank(); if (!me) return;
+  const mine = myTank(), myTeam = mine ? mine.team : 0;
+  ctx.clearRect(0, 0, VIEW_W, VIEW_H);
+  camX = Math.min(0, Math.max(VIEW_W - MAP_WIDTH, VIEW_W / 2 - me.x));
+  camY = Math.min(0, Math.max(VIEW_H - MAP_HEIGHT, VIEW_H / 2 - me.y));
+  ctx.save(); ctx.translate(camX, camY);
+
+  ctx.fillStyle = '#141e12'; ctx.fillRect(0, 0, MAP_WIDTH, MAP_HEIGHT);
+  ctx.strokeStyle = '#1b2818'; ctx.lineWidth = 2;
+  const gx0 = Math.floor(-camX / 120) * 120, gy0 = Math.floor(-camY / 120) * 120;
+  for (let x = gx0; x <= -camX + VIEW_W; x += 120) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, MAP_HEIGHT); ctx.stroke(); }
+  for (let y = gy0; y <= -camY + VIEW_H; y += 120) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(MAP_WIDTH, y); ctx.stroke(); }
+  ctx.strokeStyle = '#3d5a3a'; ctx.lineWidth = 6; ctx.strokeRect(0, 0, MAP_WIDTH, MAP_HEIGHT);
+
+  for (const n of decor) {
+    ctx.fillStyle = n[3] === 0 ? '#0d180d' : '#2b2620';
+    ctx.beginPath(); ctx.arc(n[0], n[1], n[2], 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = n[3] === 0 ? '#162b16' : '#3d362e';
+    ctx.beginPath(); ctx.arc(n[0] - 4, n[1] - 4, n[2] * 0.6, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#080e08'; ctx.lineWidth = 2; ctx.stroke();
+  }
+  for (const o of obstacles) {
+    ctx.fillStyle = '#3a3124'; ctx.fillRect(o.x, o.y, o.w, o.h);
+    ctx.fillStyle = '#4a3f30'; ctx.fillRect(o.x + 8, o.y + 8, o.w - 16, o.h - 16);
+    ctx.strokeStyle = '#201a12'; ctx.lineWidth = 4; ctx.strokeRect(o.x, o.y, o.w, o.h);
+    ctx.strokeStyle = '#18130d'; ctx.lineWidth = 2; ctx.beginPath();
+    ctx.moveTo(o.x + 20, o.y + 20); ctx.lineTo(o.x + o.w - 20, o.y + o.h - 20);
+    ctx.moveTo(o.x + o.w - 20, o.y + 20); ctx.lineTo(o.x + 20, o.y + o.h - 20); ctx.stroke();
+  }
+
+  for (const t of tanks) if (t.hp <= 0) drawTank(t, true);
+  for (const t of tanks) if (t.hp > 0) { drawTank(t, false); drawNameTagAndBar(t, mine, myTeam); }
+
+  ctx.fillStyle = 'rgba(200, 205, 200, 0.55)';
+  for (const s of smokes) { ctx.beginPath(); ctx.arc(s.x, s.y, s.radius, 0, Math.PI * 2); ctx.fill(); }
+
+  const k = (mode === 'client') ? Math.min(3, (performance.now() - snapT) / STEP) : 0;
+  for (const b of bullets) drawBullet(b, k);
+  for (const a of air) drawHeli(a);
+
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    ctx.fillStyle = p.color; ctx.beginPath(); ctx.arc(p.x, p.y, Math.max(0.1, p.size), 0, Math.PI * 2); ctx.fill();
+    p.x += p.vx * fr; p.y += p.vy * fr; p.size *= Math.pow(0.93, fr); p.life -= fr;
+    if (p.life <= 0) particles.splice(i, 1);
+  }
+  ctx.font = 'bold 15px sans-serif'; ctx.textAlign = 'center';
+  for (let i = popups.length - 1; i >= 0; i--) {
+    const p = popups[i];
+    ctx.fillStyle = '#000'; ctx.fillText(p.text, p.x + 1, p.y + 1);
+    ctx.fillStyle = p.color; ctx.fillText(p.text, p.x, p.y);
+    p.y -= 0.5 * fr; p.life -= fr;
+    if (p.life <= 0) popups.splice(i, 1);
+  }
+  ctx.restore();
+
+  drawMinimap(mine, myTeam);
+  updateHud(mine, myTeam);
+}
+
+function updateHud(mine, myTeam) {
+  let ally = 0, enemy = 0;
+  for (const t of tanks) if (t.hp > 0) { if (t.team === myTeam) ally++; else enemy++; }
+  setText('allyCount', String(ally)); setText('count', String(enemy));
+  if (mine) {
+    setText('tankName', mine.name);
+    setText('weaponName', mine.weapons[mine.wi].name);
+    setText('hp', String(Math.max(0, Math.ceil(mine.hp))));
+    setText('smokeCD', mine.smokeCD <= 0 ? 'OK' : Math.ceil(mine.smokeCD / 60) + 's');
+    setText('airCD', mine.airCD <= 0 ? 'OK' : Math.ceil(mine.airCD / 60) + 's');
+  } else { setText('tankName', '観戦中'); setText('weaponName', '-'); setText('hp', '-'); }
+  if (mode === 'host' || mode === 'client') {
+    const humans = tanks.filter(t => t.human).length;
+    setText('netInfo', 'ルーム ' + roomCode + ' | 人間 ' + humans + '人' + (mode === 'client' ? ' | Ping ' + pingMs + 'ms' : ' | ホスト'));
+  } else setText('netInfo', '');
+}
+
+function drawMinimap(mine, myTeam) {
+  mctx.clearRect(0, 0, miniCanvas.width, miniCanvas.height);
+  const sx = miniCanvas.width / MAP_WIDTH, sy = miniCanvas.height / MAP_HEIGHT;
+  mctx.fillStyle = '#3a3124';
+  for (const o of obstacles) mctx.fillRect(o.x * sx, o.y * sy, o.w * sx, o.h * sy);
+  for (const t of tanks) {
+    if (t.hp <= 0) continue;
+    mctx.fillStyle = t === mine ? '#4ade80' : (t.team === myTeam ? '#38bdf8' : '#f87171');
+    mctx.beginPath(); mctx.arc(t.x * sx, t.y * sy, t === mine ? 5 : 3.4, 0, Math.PI * 2); mctx.fill();
+  }
+  mctx.strokeStyle = 'rgba(255,255,255,0.4)'; mctx.lineWidth = 1;
+  mctx.strokeRect(-camX * sx, -camY * sy, VIEW_W * sx, VIEW_H * sy);
+}
+
+function drawNameTagAndBar(t, mine, myTeam) {
+  ctx.save(); ctx.font = 'bold 13px sans-serif'; ctx.textAlign = 'center';
+  const isMe = t === mine, ally = t.team === myTeam;
+  const color = isMe ? '#4ade80' : (ally ? '#38bdf8' : '#f87171');
+  const tag = isMe ? '[自機] ' : (ally ? '[味方] ' : '[敵] ');
+  const label = tag + (t.human ? t.pname + ' / ' : '') + t.name;
+  ctx.fillStyle = '#000'; ctx.fillText(label, t.x + 1, t.y - 41);
+  ctx.fillStyle = color; ctx.fillText(label, t.x, t.y - 42);
+  ctx.fillStyle = '#18181b'; ctx.fillRect(t.x - 22, t.y - 36, 44, 4);
+  ctx.fillStyle = color; ctx.fillRect(t.x - 22, t.y - 36, (Math.max(0, t.hp) / t.maxHp) * 44, 4);
+  const rl = t.weapons[t.wi].reload, prog = Math.max(0, Math.min(1, 1 - t.cooldown / rl));
+  ctx.fillStyle = '#18181b'; ctx.fillRect(t.x - 22, t.y - 30, 44, 2);
+  ctx.fillStyle = prog >= 1 ? '#4ade80' : '#facc15'; ctx.fillRect(t.x - 22, t.y - 30, 44 * prog, 2);
+  ctx.restore();
+}
+
+function drawBullet(b, k) {
+  ctx.save(); ctx.translate(b.x + b.vx * k, b.y + b.vy * k); ctx.rotate(Math.atan2(b.vy, b.vx));
+  if (b.type === 'tow') {
+    ctx.fillStyle = '#ff3b00'; ctx.fillRect(-10, -2.5, 20, 5);
+    ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.moveTo(-10, -5); ctx.lineTo(-4, 0); ctx.lineTo(-10, 5); ctx.fill();
+  } else if (b.type === 'heat') {
+    ctx.fillStyle = '#ffaa00'; ctx.beginPath(); ctx.moveTo(8, 0); ctx.lineTo(-2, -5); ctx.lineTo(-2, 5); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#b36b00'; ctx.fillRect(-8, -3, 6, 6);
+  } else {
+    ctx.fillStyle = b.type === 'apds' ? '#ffffff' : '#fef08a'; ctx.fillRect(-9, -1, 18, 2);
+    ctx.fillStyle = '#ef4444'; ctx.fillRect(-9, -2, 4, 4);
+  }
+  ctx.restore();
+}
+
+function drawHeli(a) {
+  ctx.save(); ctx.translate(a.x, a.y);
+  ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.beginPath(); ctx.ellipse(0, 46, 40, 10, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.scale(a.dir, 1);
+  ctx.fillStyle = a.team === 0 ? '#1e293b' : '#27272a'; ctx.fillRect(-38, -10, 76, 20);
+  ctx.fillStyle = '#09090b'; ctx.fillRect(-70, -6, 34, 8); ctx.fillRect(-70, -14, 4, 20);
+  ctx.fillStyle = '#334155'; ctx.fillRect(18, -7, 16, 14);
+  ctx.strokeStyle = 'rgba(220,220,220,0.65)'; ctx.lineWidth = 3;
+  const ra = a.t * 0.9;
+  for (let i = 0; i < 2; i++) {
+    const ang = ra + i * Math.PI / 2;
+    ctx.beginPath(); ctx.moveTo(Math.cos(ang) * 46, Math.sin(ang) * 46); ctx.lineTo(-Math.cos(ang) * 46, -Math.sin(ang) * 46); ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawTank(t, wreck) {
+  ctx.save(); ctx.translate(t.x, t.y);
+  if (wreck) ctx.globalAlpha = 0.35;
+  ctx.save(); ctx.rotate(t.bodyAngle);
+  ctx.fillStyle = '#111113'; ctx.fillRect(-28, -21, 56, 7); ctx.fillRect(-28, 14, 56, 7);
+  ctx.fillStyle = '#27272a';
+  for (let wx = -22; wx <= 22; wx += 6) { ctx.fillRect(wx, -20, 4, 5); ctx.fillRect(wx, 15, 4, 5); }
+  ctx.fillStyle = wreck ? '#2a2a2a' : t.color;
+  if (t.contourType === 'type10') {
+    ctx.beginPath(); ctx.moveTo(24, 0); ctx.lineTo(16, -15); ctx.lineTo(-24, -15); ctx.lineTo(-24, 15); ctx.lineTo(16, 15); ctx.closePath(); ctx.fill();
+  } else if (t.contourType === 'type90') {
+    ctx.fillRect(-24, -16, 48, 32);
+  } else if (t.contourType === 'm1a2') {
+    ctx.beginPath(); ctx.moveTo(28, 0); ctx.lineTo(18, -17); ctx.lineTo(-26, -17); ctx.lineTo(-26, 17); ctx.lineTo(18, 17); ctx.closePath(); ctx.fill();
+  } else if (t.contourType === 'bradley' || t.contourType === 'ztl11') {
+    ctx.fillRect(-25, -13, 50, 26);
+  } else {
+    ctx.beginPath(); ctx.moveTo(26, -5); ctx.lineTo(26, 5); ctx.lineTo(18, 15); ctx.lineTo(-24, 15); ctx.lineTo(-24, -15); ctx.lineTo(18, -15); ctx.closePath(); ctx.fill();
+  }
+  if (t.era) {
+    ctx.fillStyle = '#1e293b';
+    for (let i = -20; i <= 16; i += 5) { ctx.fillRect(i, -17, 4, 3); ctx.fillRect(i, 14, 4, 3); }
+  }
+  ctx.fillStyle = '#0f172a'; ctx.fillRect(-12, -9, 14, 18);
+  ctx.restore();
+
+  ctx.save(); ctx.rotate(t.turretAngle);
+  ctx.fillStyle = '#09090b'; ctx.fillRect(2, -4, 42, 8);
+  ctx.fillStyle = '#18181b'; ctx.fillRect(20, -5.5, 7, 11);
+  ctx.fillStyle = '#27272a'; ctx.fillRect(40, -4.5, 4, 9);
+  ctx.fillStyle = wreck ? '#333' : t.color;
+  ctx.beginPath();
+  if (t.contourType === 'm1a2') { ctx.moveTo(-12, -14); ctx.lineTo(12, -11); ctx.lineTo(22, 0); ctx.lineTo(12, 11); ctx.lineTo(-12, 14); }
+  else { ctx.moveTo(-18, -13); ctx.lineTo(10, -11); ctx.lineTo(20, 0); ctx.lineTo(10, 11); ctx.lineTo(-18, 13); }
+  ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = '#050507'; ctx.lineWidth = 1.5; ctx.stroke();
+  ctx.fillStyle = '#1c1917'; ctx.fillRect(-24, -10, 9, 20);
+  ctx.fillStyle = '#52525b';
+  ctx.fillRect(-8, -16, 4, 3); ctx.fillRect(-3, -16, 4, 3); ctx.fillRect(-8, 13, 4, 3); ctx.fillRect(-3, 13, 4, 3);
+  ctx.fillStyle = '#18181b'; ctx.fillRect(-5, -5, 10, 10);
+  ctx.fillStyle = '#3f3f46'; ctx.fillRect(3, -2, 12, 4);
+  ctx.restore();
+  ctx.restore();
+}
+
+/* ---------------- 起動 ---------------- */
+requestAnimationFrame(frame);
+window.addEventListener('beforeunload', () => { try { if (peer) peer.destroy(); } catch (e) {} });
+(function init() {
+  const q = new URLSearchParams(location.search).get('room');
+  if (q) { $('codeInput').value = q.toUpperCase().slice(0, 5); showScreen('onlineScreen'); }
+  else showScreen('menuScreen');
+})();
+</script>
+</body>
+</html>
